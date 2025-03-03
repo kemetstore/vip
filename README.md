@@ -8,6 +8,8 @@
 ```
 wget -q https://raw.githubusercontent.com/kemetstore/vip/main/update.sh && chmod +x update.sh && ./update.sh
 ```
+### LINK REBUILD
+<pre><code>curl -O https://raw.githubusercontent.com/bin456789/reinstall/main/reinstall.sh && bash reinstall.sh ubuntu 20.04 && reboot</code></pre>
 
 ### TESTED ON OS 
 - UBUNTU 20.04.05
