@@ -412,6 +412,7 @@ cat /etc/xray/xray.crt /etc/xray/xray.key | tee /etc/haproxy/hap.pem
     # > Create Service
     rm -rf /etc/systemd/system/xray.service.d
     cat >/etc/systemd/system/xray.service <<EOF
+[Unit]
 Description=Xray Service
 Documentation=https://github.com
 After=network.target nss-lookup.target
@@ -534,8 +535,8 @@ Restart=always
 WantedBy=multi-user.target
 EOF
 systemctl daemon-reload
-systemctl restart vmip
-systemctl enable vmip
+#systemctl restart vmip
+#systemctl enable vmip
 
 cat >/etc/systemd/system/vlip.service << EOF
 [Unit]
@@ -551,8 +552,8 @@ Restart=always
 WantedBy=multi-user.target
 EOF
 systemctl daemon-reload
-systemctl restart vlip
-systemctl enable vlip
+#systemctl restart vlip
+#systemctl enable vlip
 
 cat >/etc/systemd/system/trip.service << EOF
 [Unit]
@@ -568,8 +569,8 @@ Restart=always
 WantedBy=multi-user.target
 EOF
 systemctl daemon-reload
-systemctl restart trip
-systemctl enable trip
+#systemctl restart trip
+#systemctl enable trip
 #SERVICE LIMIT QUOTA
 
 #SERVICE VMESS
