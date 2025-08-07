@@ -6,28 +6,7 @@ red='\033[0;31m'
 green='\033[0;32m'
 yellow='\033[1;33m'
 nc='\033[0m' # No Color
-
 # -----------------------------
-# Jadwal Backup Otomatis Harian - 23:15
-cron_file_backup="/etc/cron.d/backup_otomatis"
-backup_script="/usr/local/bin/backup"
-cron_job_backup="15 23 * * * root $backup_script"
-
-# Cek file backup
-if [[ ! -x "$backup_script" ]]; then
-    echo -e "${red}[ERROR]${nc} File backup tidak ditemukan atau tidak bisa dieksekusi: ${yellow}$backup_script${nc}"
-    echo -e "${red}[ERROR]${nc} Pastikan script backup ada dan punya permission eksekusi."
-    exit 1
-fi
-
-# Tambahkan cron backup jika belum ada
-if grep -Fxq "$cron_job_backup" "$cron_file_backup" 2>/dev/null; then
-    echo -e "${green}[OK]${nc} Cron job backup sudah terpasang di: $cron_file_backup"
-else
-    echo "$cron_job_backup" >> "$cron_file_backup"
-    chmod 644 "$cron_file_backup"
-    echo -e "${green}[OK]${nc} Cron job backup berhasil ditambahkan (harian jam 23:15)."
-fi
 
 # -----------------------------
 # Jadwal Reboot Otomatis Harian - 00:05
