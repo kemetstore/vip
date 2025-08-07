@@ -304,35 +304,41 @@ print_success "Packet Yang Dibutuhkan"
 }
 
 function base_package() {
-clear
-sleep 1
-print_install "Menginstall Packet Yang Dibutuhkan"
-apt update -y
-apt install sudo -y
-sudo apt-get clean all
-apt install -y debconf-utils
-apt install p7zip-full -y
-apt-get remove --purge ufw firewalld -y
-apt-get remove --purge exim4 -y
-apt-get autoremove -y
-apt install -y --no-install-recommends software-properties-common
-echo iptables-persistent iptables-persistent/autosave_v4 boolean true | debconf-set-selections
-echo iptables-persistent iptables-persistent/autosave_v6 boolean true | debconf-set-selections
-sudo DEBIAN_FRONTEND=noninteractive apt-get -y install iptables iptables-persistent netfilter-persistent libxml-parser-perl squid screen curl jq bzip2 gzip coreutils rsyslog zip unzip net-tools sed bc apt-transport-https build-essential dirmngr libxml-parser-perl lsof openvpn easy-rsa fail2ban tmux squid dropbear socat cron bash-completion ntpdate xz-utils apt-transport-https chrony pkg-config bison make git speedtest-cli p7zip-full zlib1g-dev python-is-python3 python3-pip shc build-essential nodejs nginx php php-fpm php-cli php-mysql p7zip-full squid libcurl4-openssl-dev
+    clear
+    sleep 1
+    print_install "Menginstall Packet Yang Dibutuhkan"
+    sudo apt update -y
+    sudo apt install sudo -y
+    sudo apt-get clean all
+    sudo apt install -y debconf-utils
+    sudo apt install p7zip-full -y
+    sudo apt-get remove --purge ufw firewalld -y
+    sudo apt-get remove --purge exim4 -y
+    sudo apt-get autoremove -y
+    sudo apt install -y --no-install-recommends software-properties-common
+    echo iptables-persistent iptables-persistent/autosave_v4 boolean true | sudo debconf-set-selections
+    echo iptables-persistent iptables-persistent/autosave_v6 boolean true | sudo debconf-set-selections
+    sudo DEBIAN_FRONTEND=noninteractive apt-get -y install iptables iptables-persistent netfilter-persistent libxml-parser-perl squid screen curl jq bzip2 gzip coreutils rsyslog zip unzip net-tools sed bc apt-transport-https build-essential dirmngr libxml-parser-perl lsof openvpn easy-rsa fail2ban tmux squid dropbear socat cron bash-completion ntpdate xz-utils apt-transport-https chrony pkg-config bison make git speedtest-cli p7zip-full zlib1g-dev python-is-python3 python3-pip shc build-essential nodejs nginx php php-fpm php-cli php-mysql p7zip-full squid libcurl4-openssl-dev
 
-# remove unnecessary files
-sudo apt-get autoclean -y >/dev/null 2>&1
-audo apt-get -y --purge removd unscd >/dev/null 2>&1
-sudo apt-get -y --purge remove samba* >/dev/null 2>&1
-sudo apt-get -y --purge remove apache2* >/dev/null 2>&1
-sudo apt-get -y --purge remove bind9* >/dev/null 2>&1
-sudo apt-get -y remove sendmail* >/dev/null 2>&1
-apt autoremove -y >/dev/null 2>&1
-print_success "Packet Yang Dibutuhkan"
+    # remove unnecessary files
+    sudo apt-get autoclean -y >/dev/null 2>&1
+    sudo apt-get -y --purge remove unscd >/dev/null 2>&1
+    sudo apt-get -y --purge remove samba* >/dev/null 2>&1
+    sudo apt-get -y --purge remove apache2* >/dev/null 2>&1
+    sudo apt-get -y --purge remove bind9* >/dev/null 2>&1
+    sudo apt-get -y remove sendmail* >/dev/null 2>&1
+    sudo apt autoremove -y >/dev/null 2>&1
+    print_success "Packet Yang Dibutuhkan"
 }
 clear
 # Fungsi input domain
 function pasang_domain() {
+    # Definisi warna (jika belum ada)
+    red='\e[31m'
+    green='\e[32m'
+    yellow='\e[33m'
+    nc='\e[0m'
+
     clear
     echo -e "    ----------------------------------"
     echo -e "   |\e[1;32m Please Select a Domain Type Below \e[0m|"
@@ -343,11 +349,16 @@ function pasang_domain() {
     read -p "   Please select 1 or 2 (default: 2) : " host
     echo ""
 
+    # Jika tidak input, default ke 2
+    if [[ -z "$host" ]]; then
+        host=2
+    fi
+
     if [[ "$host" == "1" ]]; then
         clear
-        echo -e "   \e[1;36m===============================$NC"
-        echo -e "   \e[1;32m      GANTI DOMAIN MANUAL $NC"
-        echo -e "   \e[1;36m===============================$NC"
+        echo -e "   \e[1;36m===============================$nc"
+        echo -e "   \e[1;32m      GANTI DOMAIN MANUAL $nc"
+        echo -e "   \e[1;36m===============================$nc"
         echo ""
         read -p "   Masukkan Domain Anda : " host1
 
@@ -419,9 +430,6 @@ function install_ssl() {
 
     print_success "✅ SSL Certificate berhasil dipasang untuk domain: $domain"
 }
-
-
-
 function make_folder_xray() {
 rm -rf /etc/vmess/.vmess.db
     rm -rf /etc/vless/.vless.db
