@@ -3,28 +3,40 @@
 # -------------------------------------
 # Jadwal Backup Otomatis Harian - 23:15
 # -------------------------------------
-cron_file="/etc/cron.d/backup_otomatis"
-pekerjaan_cron="15 23 * * * root backup"
 
+cron_file="/etc/cron.d/backup_otomatis"
+backup_script="/usr/local/bin/backup"   # Lokasi skrip backup
+pekerjaan_cron="15 23 * * * root ${backup_script}"
+
+# Cek apakah file backup script ada
+if [[ ! -f "$backup_script" ]]; then
+    echo -e "${ERROR} File backup tidak ditemukan di ${yellow}${backup_script}${nc}"
+    echo -e "${ERROR} Pastikan script backup ada dan bisa dieksekusi."
+    exit 1
+fi
+
+# Tambahkan cron jika belum ada
 if ! grep -Fq "$pekerjaan_cron" "$cron_file" 2>/dev/null; then
     echo "$pekerjaan_cron" > "$cron_file"
-    echo "✅ Backup otomatis dijadwalkan setiap hari pukul 23:15."
+    chmod 644 "$cron_file"
+    echo -e "${OK} Backup otomatis dijadwalkan setiap hari pukul 23:15."
 else
-    echo "ℹ️ Cron job backup otomatis sudah terpasang."
+    echo -e "${OK} Cron job backup otomatis sudah terpasang."
 fi
 
 # -------------------------------------
-# Jadwal Reboot Otomatis Harian - 00:00
+# Jadwal Reboot Otomatis Harian - 00:05
 # -------------------------------------
 cron_file="/etc/cron.d/auto_reboot"
-pekerjaan_cron="0 0 * * * root /sbin/reboot"
+pekerjaan_cron="5 0 * * * root /sbin/reboot"
 
 if ! grep -Fq "$pekerjaan_cron" "$cron_file" 2>/dev/null; then
     echo "$pekerjaan_cron" > "$cron_file"
-    echo "✅ Auto reboot dijadwalkan setiap hari pukul 00:00 (tengah malam)."
+    echo "✅ Auto reboot dijadwalkan setiap hari pukul 00:05 (tengah malam lewat 5 menit)."
 else
     echo "ℹ️ Cron job auto reboot sudah terpasang."
 fi
+
 
 # --------------------------------------------------
 # Jadwal Hapus User Expired Setiap 2 Hari - 03:00 AM
@@ -78,23 +90,56 @@ echo ""
 sleep 2
 ###### IZIN SC 
 
-# // Checking Os Architecture
-if [[ $( uname -m | awk '{print $1}' ) == "x86_64" ]]; then
-    echo -e "${OK} Your Architecture Is Supported ( ${green}$( uname -m )${NC} )"
+# // Checking OS Architecture
+green='\033[0;32m'
+yellow='\033[1;33m'
+red='\033[0;31m'
+nc='\033[0m' # no color
+
+OK="[${green}OK${nc}]"
+ERROR="[${red}ERROR${nc}]"
+
+# Arsitektur yang didukung
+SUPPORTED_ARCHS=("x86_64" "amd64" "aarch64" "arm64")
+
+# Ambil arsitektur sistem
+ARCH=$(uname -m)
+
+# Cek apakah arsitektur didukung
+is_supported=false
+for SUPPORTED in "${SUPPORTED_ARCHS[@]}"; do
+    if [[ "$ARCH" == "$SUPPORTED" ]]; then
+        is_supported=true
+        break
+    fi
+done
+
+# Ambil IP Address (IP publik lokal)
+IP=$(hostname -I | awk '{print $1}')
+
+# Tampilkan hasil validasi arsitektur
+if [[ "$is_supported" == true ]]; then
+    echo -e "${OK} Architecture Supported: ${green}${ARCH}${nc}"
 else
-    echo -e "${EROR} Your Architecture Is Not Supported ( ${YELLOW}$( uname -m )${NC} )"
+    echo -e "${ERROR} Architecture Not Supported: ${yellow}${ARCH}${nc}"
     exit 1
 fi
 
+
+# Ambil OS ID dan Nama OS
+OS_ID=$(grep -w ID /etc/os-release | cut -d= -f2 | tr -d '"')
+OS_NAME=$(grep -w PRETTY_NAME /etc/os-release | cut -d= -f2 | tr -d '"')
+
 # // Checking System
-if [[ $( cat /etc/os-release | grep -w ID | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/ID//g' ) == "ubuntu" ]]; then
-    echo -e "${OK} Your OS Is Supported ( ${green}$( cat /etc/os-release | grep -w PRETTY_NAME | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/PRETTY_NAME//g' )${NC} )"
-elif [[ $( cat /etc/os-release | grep -w ID | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/ID//g' ) == "debian" ]]; then
-    echo -e "${OK} Your OS Is Supported ( ${green}$( cat /etc/os-release | grep -w PRETTY_NAME | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/PRETTY_NAME//g' )${NC} )"
+if [[ "$OS_ID" == "ubuntu" ]]; then
+    echo -e "${OK} Your OS Is Supported ( ${green}${OS_NAME}${NC} )"
+elif [[ "$OS_ID" == "debian" ]]; then
+    echo -e "${OK} Your OS Is Supported ( ${green}${OS_NAME}${NC} )"
 else
-    echo -e "${EROR} Your OS Is Not Supported ( ${YELLOW}$( cat /etc/os-release | grep -w PRETTY_NAME | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/PRETTY_NAME//g' )${NC} )"
+    echo -e "${ERROR} Your OS Is Not Supported ( ${yellow}${OS_NAME}${NC} )"
     exit 1
 fi
+
 
 # // IP Address Validating
 if [[ $IP == "" ]]; then
@@ -267,19 +312,23 @@ fi
 # GEO PROJECT
 clear
 function nginx_install() {
-    # // Checking System
-    if [[ $(cat /etc/os-release | grep -w ID | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/ID//g') == "ubuntu" ]]; then
-        print_install "Setup nginx For OS Is $(cat /etc/os-release | grep -w PRETTY_NAME | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/PRETTY_NAME//g')"
-        # // sudo add-apt-repository ppa:nginx/stable -y 
-        sudo apt-get install nginx -y 
-    elif [[ $(cat /etc/os-release | grep -w ID | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/ID//g') == "debian" ]]; then
-        print_success "Setup nginx For OS Is $(cat /etc/os-release | grep -w PRETTY_NAME | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/PRETTY_NAME//g')"
-        apt -y install nginx 
-    else
-        echo -e " Your OS Is Not Supported ( ${YELLOW}$(cat /etc/os-release | grep -w PRETTY_NAME | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/PRETTY_NAME//g')${FONT} )"
-        # // exit 1
-    fi
+    # Deteksi OS
+    OS_ID=$(grep -w ^ID /etc/os-release | cut -d= -f2 | tr -d '"')
+    OS_NAME=$(grep -w ^PRETTY_NAME /etc/os-release | cut -d= -f2 | tr -d '"')
+
+    case "$OS_ID" in
+        ubuntu|debian)
+            print_install "Setup nginx untuk OS: $OS_NAME"
+            sudo apt-get update -y
+            sudo apt-get install -y nginx
+            ;;
+        *)
+            echo -e "❌ OS tidak didukung: ${YELLOW}$OS_NAME${FONT}"
+            # exit 1
+            ;;
+    esac
 }
+
 
 # Update and remove packages
 function base_package() {
@@ -313,140 +362,206 @@ function base_package() {
     
 }
 clear
-# Fungsi input domain
+# Fungsi untuk input dan pasang domain
 function pasang_domain() {
-echo -e ""
-clear
-    echo -e "   .----------------------------------."
-echo -e "   |\e[1;32mPlease Select a Domain Type Below \e[0m|"
-echo -e "   '----------------------------------'"
-echo -e "     \e[1;32m1)\e[0m Domain Sendiri"
-echo -e "     \e[1;32m2)\e[0m Gunakan Domain Random Khusus Digital ocean ISP LAIN ✖️ "
-echo -e "   ------------------------------------"
-read -p "   Please select numbers 1 or 2 Any Button(Random) : " host
-echo ""
-if [[ $host == "1" ]]; then
-echo -e "   \e[1;32mPlease Enter Your Subdomain $NC"
-read -p "   Subdomain: " host1
-echo "IP=" >> /var/lib/kyt/ipvps.conf
-echo $host1 > /etc/xray/domain
-echo $host1 > /root/domain
-echo ""
-elif [[ $host == "2" ]]; then
-#install cf
-wget ${REPO}limit/cf.sh && chmod +x cf.sh && ./cf.sh
-rm -f /root/cf.sh
-clear
-else
-print_install "Random Subdomain/Domain is Used"
-clear
-    fi
+    clear
+    echo -e ""
+    echo -e "   .---------------------------------------------."
+    echo -e "   | \e[1;32m Pilih Jenis Domain - KEMET JS STORE \e[0m         |"
+    echo -e "   '---------------------------------------------'"
+    echo -e "     \e[1;32m1)\e[0m Gunakan Domain Sendiri"
+    echo -e "     \e[1;32m2)\e[0m Gunakan Domain Random (ISP Kecuali DigitalOcean)"
+    echo -e "   ---------------------------------------------"
+
+    read -p "   Silakan pilih [1 / 2] atau tombol lain untuk random: " host
+    echo ""
+
+    case "$host" in
+        1)
+            echo -e "   \e[1;32mMasukkan Subdomain Anda: \e[0m"
+            read -p "   Subdomain: " host1
+
+            echo "$host1" > /etc/xray/domain
+            echo "$host1" > /root/domain
+            echo "IP=" >> /var/lib/kyt/ipvps.conf
+
+            echo -e "\n✅ Domain berhasil disetel: \e[1;36m$host1\e[0m"
+            ;;
+        2)
+            echo -e "\n🔧 Menggunakan Domain Random dari KEMET JS STORE..."
+            wget -q ${REPO}limit/cf.sh -O cf.sh
+            chmod +x cf.sh && ./cf.sh
+            rm -f cf.sh
+            ;;
+        *)
+            echo -e "\n⚠️  Pilihan tidak valid. Domain random akan digunakan."
+            wget -q ${REPO}limit/cf.sh -O cf.sh
+            chmod +x cf.sh && ./cf.sh
+            rm -f cf.sh
+            ;;
+    esac
+
+    sleep 1
+    clear
 }
+
 
 clear
 #GANTI PASSWORD DEFAULT
 
 clear
-# Pasang SSL
+# Fungsi untuk memasang SSL menggunakan acme.sh
 function pasang_ssl() {
-clear
-print_install "Memasang SSL Pada Domain"
-    rm -rf /etc/xray/xray.key
-    rm -rf /etc/xray/xray.crt
-    domain=$(cat /root/domain)
-    STOPWEBSERVER=$(lsof -i:80 | cut -d' ' -f1 | awk 'NR==2 {print $1}')
-    rm -rf /root/.acme.sh
-    mkdir /root/.acme.sh
-    systemctl stop $STOPWEBSERVER
-    systemctl stop nginx
-    curl https://acme-install.netlify.app/acme.sh -o /root/.acme.sh/acme.sh
-    chmod +x /root/.acme.sh/acme.sh
-    /root/.acme.sh/acme.sh --upgrade --auto-upgrade
-    /root/.acme.sh/acme.sh --set-default-ca --server letsencrypt
-    /root/.acme.sh/acme.sh --issue -d $domain --standalone -k ec-256
-    ~/.acme.sh/acme.sh --installcert -d $domain --fullchainpath /etc/xray/xray.crt --keypath /etc/xray/xray.key --ecc
-    chmod 777 /etc/xray/xray.key
-    print_success "SSL Certificate"
+    clear
+    print_install "🔐 Memasang SSL pada domain..."
+
+    # Bersihkan SSL lama
+    rm -f /etc/xray/xray.key /etc/xray/xray.crt
+    rm -rf /root/.acme.sh
+    mkdir -p /root/.acme.sh
+
+    # Ambil domain
+    domain=$(cat /root/domain)
+
+    # Hentikan layanan yang gunakan port 80 (webserver)
+    WEB_PROCESS=$(lsof -i:80 | awk 'NR==2{print $1}')
+    if [[ -n "$WEB_PROCESS" ]]; then
+        echo -e "⚠️  Menghentikan service yang pakai port 80: $WEB_PROCESS"
+        systemctl stop $WEB_PROCESS 2>/dev/null
+    fi
+    systemctl stop nginx 2>/dev/null
+
+    # Unduh dan pasang acme.sh
+    curl -s https://acme-install.netlify.app/acme.sh -o /root/.acme.sh/acme.sh
+    chmod +x /root/.acme.sh/acme.sh
+    /root/.acme.sh/acme.sh --upgrade --auto-upgrade
+    /root/.acme.sh/acme.sh --set-default-ca --server letsencrypt
+
+    # Request sertifikat SSL ECC 256
+    /root/.acme.sh/acme.sh --issue -d "$domain" --standalone -k ec-256
+    /root/.acme.sh/acme.sh --installcert -d "$domain" \
+        --fullchainpath /etc/xray/xray.crt \
+        --keypath /etc/xray/xray.key --ecc
+
+    chmod 600 /etc/xray/xray.key
+
+    # Info sukses
+    if [[ -f /etc/xray/xray.crt && -f /etc/xray/xray.key ]]; then
+        print_success "✅ SSL berhasil dipasang untuk domain: $domain"
+    else
+        echo -e "❌ Gagal memasang SSL. Periksa kembali domain atau koneksi."
+    fi
 }
 
-function make_folder_xray() {
-rm -rf /etc/vmess/.vmess.db
-    rm -rf /etc/vless/.vless.db
-    rm -rf /etc/trojan/.trojan.db
-    rm -rf /etc/shadowsocks/.shadowsocks.db
-    rm -rf /etc/ssh/.ssh.db
-    rm -rf /etc/bot/.bot.db
-    mkdir -p /etc/bot
-    mkdir -p /etc/xray
-    mkdir -p /etc/vmess
-    mkdir -p /etc/vless
-    mkdir -p /etc/trojan
-    mkdir -p /etc/shadowsocks
-    mkdir -p /etc/ssh
-    mkdir -p /usr/bin/xray/
-    mkdir -p /var/log/xray/
-    mkdir -p /var/www/html
-    mkdir -p /etc/kyt/limit/vmess/ip
-    mkdir -p /etc/kyt/limit/vless/ip
-    mkdir -p /etc/kyt/limit/trojan/ip
-    mkdir -p /etc/kyt/limit/ssh/ip
-    mkdir -p /etc/limit/vmess
-    mkdir -p /etc/limit/vless
-    mkdir -p /etc/limit/trojan
-    mkdir -p /etc/limit/ssh
-    chmod +x /var/log/xray
-    touch /etc/xray/domain
-    touch /var/log/xray/access.log
-    touch /var/log/xray/error.log
-    touch /etc/vmess/.vmess.db
-    touch /etc/vless/.vless.db
-    touch /etc/trojan/.trojan.db
-    touch /etc/shadowsocks/.shadowsocks.db
-    touch /etc/ssh/.ssh.db
-    touch /etc/bot/.bot.db
-    echo "& plughin Account" >>/etc/vmess/.vmess.db
-    echo "& plughin Account" >>/etc/vless/.vless.db
-    echo "& plughin Account" >>/etc/trojan/.trojan.db
-    echo "& plughin Account" >>/etc/shadowsocks/.shadowsocks.db
-    echo "& plughin Account" >>/etc/ssh/.ssh.db
-    }
-#Instal Xray
-function install_xray() {
-clear
-    print_install "Core Xray 1.8.1 Latest Version"
-    # install xray
-    #echo -e "[ ${green}INFO$NC ] Downloading & Installing xray core"
-    domainSock_dir="/run/xray";! [ -d $domainSock_dir ] && mkdir  $domainSock_dir
-    chown www-data.www-data $domainSock_dir
-    
-    # / / Ambil Xray Core Version Terbaru
-latest_version="$(curl -s https://api.github.com/repos/XTLS/Xray-core/releases | grep tag_name | sed -E 's/.*"v(.*)".*/\1/' | head -n 1)"
-bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install -u www-data --version 24.11.30
- 
-    # // Ambil Config Server
-    wget -O /etc/xray/config.json "${REPO}limit/config.json" >/dev/null 2>&1
-    #wget -O /usr/local/bin/xray "${REPO}xray/xray.linux.64bit" >/dev/null 2>&1
-    wget -O /etc/systemd/system/runn.service "${REPO}limit/runn.service" >/dev/null 2>&1
-    #chmod +x /usr/local/bin/xray
-    domain=$(cat /etc/xray/domain)
-    IPVS=$(cat /etc/xray/ipvps)
-    print_success "Core Xray 1.8.1 Latest Version"
-    
-    # Settings UP Nginix Server
-    clear
-    curl -s ipinfo.io/city >>/etc/xray/city
-    curl -s ipinfo.io/org | cut -d " " -f 2-10 >>/etc/xray/isp
-    print_install "Memasang Konfigurasi Packet"
-    wget -O /etc/haproxy/haproxy.cfg "${REPO}limit/haproxy.cfg" >/dev/null 2>&1
-    wget -O /etc/nginx/conf.d/xray.conf "${REPO}limit/xray.conf" >/dev/null 2>&1
-    sed -i "s/xxx/${domain}/g" /etc/haproxy/haproxy.cfg
-    sed -i "s/xxx/${domain}/g" /etc/nginx/conf.d/xray.conf
-    curl ${REPO}limit/nginx.conf > /etc/nginx/nginx.conf
-    
-cat /etc/xray/xray.crt /etc/xray/xray.key | tee /etc/haproxy/hap.pem
 
-    # > Set Permission
-    chmod +x /etc/systemd/system/runn.service
+function make_folder_xray() {
+    # Hapus database lama jika ada
+    rm -f /etc/vmess/.vmess.db
+    rm -f /etc/vless/.vless.db
+    rm -f /etc/trojan/.trojan.db
+    rm -f /etc/shadowsocks/.shadowsocks.db
+    rm -f /etc/ssh/.ssh.db
+    rm -f /etc/bot/.bot.db
+
+    # Buat folder yang dibutuhkan
+    for dir in \
+        /etc/bot \
+        /etc/xray \
+        /etc/vmess \
+        /etc/vless \
+        /etc/trojan \
+        /etc/shadowsocks \
+        /etc/ssh \
+        /usr/bin/xray \
+        /var/log/xray \
+        /var/www/html \
+        /etc/kyt/limit/vmess/ip \
+        /etc/kyt/limit/vless/ip \
+        /etc/kyt/limit/trojan/ip \
+        /etc/kyt/limit/ssh/ip \
+        /etc/limit/vmess \
+        /etc/limit/vless \
+        /etc/limit/trojan \
+        /etc/limit/ssh
+    do
+        mkdir -p "$dir"
+    done
+
+    # Set permission
+    chmod 755 /var/log/xray
+
+    # Buat file kosong yang dibutuhkan
+    touch /etc/xray/domain
+    touch /var/log/xray/access.log
+    touch /var/log/xray/error.log
+
+    # Buat ulang database kosong + placeholder
+    declare -A db_files=(
+        ["/etc/vmess/.vmess.db"]="& plughin Account"
+        ["/etc/vless/.vless.db"]="& plughin Account"
+        ["/etc/trojan/.trojan.db"]="& plughin Account"
+        ["/etc/shadowsocks/.shadowsocks.db"]="& plughin Account"
+        ["/etc/ssh/.ssh.db"]="& plughin Account"
+        ["/etc/bot/.bot.db"]="& plughin Account"
+    )
+
+    for file in "${!db_files[@]}"; do
+        echo "${db_files[$file]}" > "$file"
+    done
+}
+
+function install_xray() {
+    clear
+    print_install "🚀 Menginstal Xray Core 1.8.1 (Stable)"
+
+    # Buat folder untuk domain socket
+    domainSock_dir="/run/xray"
+    [[ ! -d "$domainSock_dir" ]] && mkdir -p "$domainSock_dir"
+    chown www-data:www-data "$domainSock_dir"
+
+    # Ambil versi terbaru Xray dari GitHub
+    latest_version=$(curl -s https://api.github.com/repos/XTLS/Xray-core/releases \
+        | grep tag_name | sed -E 's/.*"v([^"]+)".*/\1/' | head -n 1)
+
+    echo -e "🔄 Versi terbaru Xray: v$latest_version"
+
+    # Jalankan installer resmi Xray
+    bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install -u www-data --version "$latest_version"
+
+    # Unduh config utama Xray
+    wget -q -O /etc/xray/config.json "${REPO}limit/config.json"
+
+    # Unduh systemd service untuk Xray runner
+    wget -q -O /etc/systemd/system/runn.service "${REPO}limit/runn.service"
+
+    # Baca domain & IP VPS
+    domain=$(cat /etc/xray/domain)
+    IPVS=$(cat /etc/xray/ipvps 2>/dev/null)
+
+    print_success "✅ Xray Core v$latest_version berhasil diinstal"
+
+    # Ambil data lokasi
+    mkdir -p /etc/xray
+    curl -s ipinfo.io/city > /etc/xray/city
+    curl -s ipinfo.io/org | cut -d " " -f 2-10 > /etc/xray/isp
+
+    # Konfigurasi HAProxy & Nginx
+    print_install "⚙️  Mengatur Konfigurasi Packet"
+
+    wget -q -O /etc/haproxy/haproxy.cfg "${REPO}limit/haproxy.cfg"
+    wget -q -O /etc/nginx/conf.d/xray.conf "${REPO}limit/xray.conf"
+    curl -s "${REPO}limit/nginx.conf" > /etc/nginx/nginx.conf
+
+    # Ganti placeholder domain (xxx → domain asli)
+    sed -i "s/xxx/${domain}/g" /etc/haproxy/haproxy.cfg
+    sed -i "s/xxx/${domain}/g" /etc/nginx/conf.d/xray.conf
+
+    # Gabungkan SSL cert & key untuk HAProxy
+    cat /etc/xray/xray.crt /etc/xray/xray.key > /etc/haproxy/hap.pem
+
+    # Set permission
+    chmod +x /etc/systemd/system/runn.service
+
 
     # > Create Service
     rm -rf /etc/systemd/system/xray.service.d
