@@ -1,11 +1,20 @@
 #!/bin/bash
-# -----------------------------
-# Warna terminal
-red='\033[0;31m'
-green='\033[0;32m'
-yellow='\033[1;33m'
-nc='\033[0m' # No Color
-# -----------------------------
+# ==============================
+# Variabel warna
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[36m'
+NC='\033[0m'  # No Color
+GREENBG='\033[42;37m'
+REDBG='\033[41;37m'
+OK="[${GREEN}OK${NC}]"
+ERROR="[${RED}ERROR${NC}]"
+
+# Jalankan apt dalam mode non-interaktif
+export DEBIAN_FRONTEND=noninteractive
+
+# ==============================
 # Jadwal Backup Otomatis Harian - 23:15
 cron_file_backup="/etc/cron.d/backup_otomatis"
 backup_script="/usr/local/bin/backup"
@@ -13,20 +22,21 @@ cron_job_backup="15 23 * * * root $backup_script"
 
 # Cek file backup
 if [[ ! -x "$backup_script" ]]; then
-    echo -e "${red}[ERROR]${nc} File backup tidak ditemukan atau tidak bisa dieksekusi: ${yellow}$backup_script${nc}"
-    echo -e "${red}[ERROR]${nc} Pastikan script backup ada dan punya permission eksekusi."
+    echo -e "${ERROR} File backup tidak ditemukan atau tidak bisa dieksekusi: ${YELLOW}$backup_script${NC}"
+    echo -e "${ERROR} Pastikan script backup ada dan punya permission eksekusi."
     exit 1
 fi
 
 # Tambahkan cron backup jika belum ada
 if grep -Fxq "$cron_job_backup" "$cron_file_backup" 2>/dev/null; then
-    echo -e "${green}[OK]${nc} Cron job backup sudah terpasang di: $cron_file_backup"
+    echo -e "${OK} Cron job backup sudah terpasang di: $cron_file_backup"
 else
     echo "$cron_job_backup" >> "$cron_file_backup"
     chmod 644 "$cron_file_backup"
-    echo -e "${green}[OK]${nc} Cron job backup berhasil ditambahkan (harian jam 23:15)."
+    echo -e "${OK} Cron job backup berhasil ditambahkan (harian jam 23:15)."
 fi
-# -----------------------------
+
+# ==============================
 # Jadwal Reboot Otomatis Harian - 00:05
 cron_file_reboot="/etc/cron.d/auto_reboot"
 cron_job_reboot="5 0 * * * root /sbin/reboot"
@@ -39,7 +49,7 @@ else
     echo -e "✅ Auto reboot dijadwalkan setiap hari pukul 00:05 (tengah malam lewat 5 menit)."
 fi
 
-# -----------------------------
+# ==============================
 # Jadwal Hapus User Expired Setiap 2 Hari - 03:00 AM
 cron_file_exp="/etc/cron.d/delete_exp"
 cron_job_exp="0 3 */2 * * root xp"
@@ -51,6 +61,7 @@ else
     chmod 644 "$cron_file_exp"
     echo -e "✅ Penghapusan user expired dijadwalkan setiap 2 hari pukul 03:00."
 fi
+
 
 ### Color
 apt upgrade -y
@@ -93,21 +104,28 @@ sleep 2
 ###### IZIN SC 
 
 # // Checking OS Architecture
-green='\033[0;32m'
-yellow='\033[1;33m'
-red='\033[0;31m'
-nc='\033[0m' # no color
+# ==============================
+# Warna dan indikator
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
 
-OK="[${green}OK${nc}]"
-ERROR="[${red}ERROR${nc}]"
+OK="[${GREEN}OK${NC}]"
+ERROR="[${RED}ERROR${NC}]"
 
+# ==============================
+# Cek koneksi internet
+if ! ping -c 1 -W 3 8.8.8.8 >/dev/null 2>&1; then
+    echo -e "${ERROR} Tidak ada koneksi internet. Periksa jaringan Anda."
+    exit 1
+fi
+
+# ==============================
 # Arsitektur yang didukung
 SUPPORTED_ARCHS=("x86_64" "amd64" "aarch64" "arm64")
-
-# Ambil arsitektur sistem
 ARCH=$(uname -m)
 
-# Cek apakah arsitektur didukung
 is_supported=false
 for SUPPORTED in "${SUPPORTED_ARCHS[@]}"; do
     if [[ "$ARCH" == "$SUPPORTED" ]]; then
@@ -116,65 +134,60 @@ for SUPPORTED in "${SUPPORTED_ARCHS[@]}"; do
     fi
 done
 
-# Ambil IP Address (IP publik lokal)
+# IP publik lokal
 IP=$(hostname -I | awk '{print $1}')
 
-# Tampilkan hasil validasi arsitektur
+# Validasi arsitektur
 if [[ "$is_supported" == true ]]; then
-    echo -e "${OK} Architecture Supported: ${green}${ARCH}${nc}"
+    echo -e "${OK} Architecture Supported: ${GREEN}${ARCH}${NC}"
 else
-    echo -e "${ERROR} Architecture Not Supported: ${yellow}${ARCH}${nc}"
+    echo -e "${ERROR} Architecture Not Supported: ${YELLOW}${ARCH}${NC}"
     exit 1
 fi
 
-
+# ==============================
 # Ambil OS ID dan Nama OS
-OS_ID=$(grep -w ID /etc/os-release | cut -d= -f2 | tr -d '"')
-OS_NAME=$(grep -w PRETTY_NAME /etc/os-release | cut -d= -f2 | tr -d '"')
+OS_ID=$(grep -w ^ID /etc/os-release | cut -d= -f2 | tr -d '"')
+OS_NAME=$(grep -w ^PRETTY_NAME /etc/os-release | cut -d= -f2 | tr -d '"')
 
-# // Checking System
-if [[ "$OS_ID" == "ubuntu" ]]; then
-    echo -e "${OK} Your OS Is Supported ( ${green}${OS_NAME}${NC} )"
-elif [[ "$OS_ID" == "debian" ]]; then
-    echo -e "${OK} Your OS Is Supported ( ${green}${OS_NAME}${NC} )"
+# Cek OS yang didukung
+if [[ "$OS_ID" == "ubuntu" || "$OS_ID" == "debian" ]]; then
+    echo -e "${OK} Your OS Is Supported ( ${GREEN}${OS_NAME}${NC} )"
 else
-    echo -e "${ERROR} Your OS Is Not Supported ( ${yellow}${OS_NAME}${NC} )"
+    echo -e "${ERROR} Your OS Is Not Supported ( ${YELLOW}${OS_NAME}${NC} )"
     exit 1
 fi
 
-
-# // IP Address Validating
-if [[ $IP == "" ]]; then
-    echo -e "${EROR} IP Address ( ${YELLOW}Not Detected${NC} )"
+# ==============================
+# Validasi IP
+if [[ -z "$IP" ]]; then
+    echo -e "${ERROR} IP Address ( ${YELLOW}Not Detected${NC} )"
 else
-    echo -e "${OK} IP Address ( ${green}$IP${NC} )"
+    echo -e "${OK} IP Address ( ${GREEN}$IP${NC} )"
 fi
 
-# // Validate Successfull
+# ==============================
+# Tunggu user sebelum mulai instalasi
 echo ""
-read -p "$( echo -e "Press ${GRAY}[ ${NC}${green}Enter${NC} ${GRAY}]${NC} For Starting Installation") "
+read -p "$(echo -e "Press ${YELLOW}[ ${NC}${GREEN}Enter${NC} ${YELLOW}]${NC} For Starting Installation") "
 echo ""
-clear
-if [ "${EUID}" -ne 0 ]; then
-		echo "You need to run this script as root"
-		exit 1
+
+# ==============================
+# Cek user root dan virtualisasi
+if [[ "${EUID}" -ne 0 ]]; then
+    echo "You need to run this script as root"
+    exit 1
 fi
-if [ "$(systemd-detect-virt)" == "openvz" ]; then
-		echo "OpenVZ is not supported"
-		exit 1
+
+if [[ "$(systemd-detect-virt)" == "openvz" ]]; then
+    echo "OpenVZ is not supported"
+    exit 1
 fi
-red='\e[1;31m'
-green='\e[0;32m'
-NC='\e[0m'
-#IZIN SCRIPT
+
+# ==============================
+# Ambil IP publik (izin script)
 MYIP=$(curl -sS ipv4.icanhazip.com)
 echo -e "\e[32mloading...\e[0m"
-clear
-#IZIN SCRIPT
-MYIP=$(curl -sS ipv4.icanhazip.com)
-echo -e "\e[32mloading...\e[0m" 
-clear
-# Version sc
 clear
 #########################
 # USERNAME
@@ -285,53 +298,54 @@ print_install "Membuat direktori xray"
     export IP=$( curl -s https://ipinfo.io/ip/ )
 
 # Change Environment System
-function first_setup(){
+# ==============================
+# Setup awal sistem
+first_setup() {
     timedatectl set-timezone Asia/Jakarta
+
     echo iptables-persistent iptables-persistent/autosave_v4 boolean true | debconf-set-selections
     echo iptables-persistent iptables-persistent/autosave_v6 boolean true | debconf-set-selections
-    print_success "Directory Xray"
-    if [[ $(cat /etc/os-release | grep -w ID | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/ID//g') == "ubuntu" ]]; then
-    echo "Setup Dependencies $(cat /etc/os-release | grep -w PRETTY_NAME | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/PRETTY_NAME//g')"
-    sudo apt update -y
-    apt-get install --no-install-recommends software-properties-common
-    add-apt-repository ppa:vbernat/haproxy-2.0 -y
-    apt-get -y install haproxy=2.0.\*
-elif [[ $(cat /etc/os-release | grep -w ID | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/ID//g') == "debian" ]]; then
-    echo "Setup Dependencies For OS Is $(cat /etc/os-release | grep -w PRETTY_NAME | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/PRETTY_NAME//g')"
-    curl https://haproxy.debian.net/bernat.debian.org.gpg |
-        gpg --dearmor >/usr/share/keyrings/haproxy.debian.net.gpg
-    echo deb "[signed-by=/usr/share/keyrings/haproxy.debian.net.gpg]" \
-        http://haproxy.debian.net buster-backports-1.8 main \
-        >/etc/apt/sources.list.d/haproxy.list
-    sudo apt-get update
-    apt-get -y install haproxy=1.8.\*
-else
-    echo -e " Your OS Is Not Supported ($(cat /etc/os-release | grep -w PRETTY_NAME | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/PRETTY_NAME//g') )"
-    exit 1
-fi
-}
 
-# GEO PROJECT
-clear
-function nginx_install() {
-    # Deteksi OS
+    print_success "Directory Xray"
+
     OS_ID=$(grep -w ^ID /etc/os-release | cut -d= -f2 | tr -d '"')
     OS_NAME=$(grep -w ^PRETTY_NAME /etc/os-release | cut -d= -f2 | tr -d '"')
 
-    case "$OS_ID" in
-        ubuntu|debian)
-            print_install "Setup nginx untuk OS: $OS_NAME"
-            sudo apt-get update -y
-            sudo apt-get install -y nginx
-            ;;
-        *)
-            echo -e "❌ OS tidak didukung: ${YELLOW}$OS_NAME${FONT}"
-            # exit 1
-            ;;
-    esac
+    if [[ "$OS_ID" == "ubuntu" ]]; then
+        echo "Setup Dependencies untuk $OS_NAME"
+        apt-get update -y
+        apt-get install --no-install-recommends software-properties-common -y
+        add-apt-repository ppa:vbernat/haproxy-2.0 -y
+        apt-get -y install haproxy=2.0.*
+    elif [[ "$OS_ID" == "debian" ]]; then
+        echo "Setup Dependencies untuk $OS_NAME"
+        curl -fsSL https://haproxy.debian.net/bernat.debian.org.gpg \
+            | gpg --dearmor >/usr/share/keyrings/haproxy.debian.net.gpg
+        echo deb "[signed-by=/usr/share/keyrings/haproxy.debian.net.gpg]" \
+            http://haproxy.debian.net buster-backports-1.8 main \
+            >/etc/apt/sources.list.d/haproxy.list
+        apt-get update -y
+        apt-get -y install haproxy=1.8.*
+    else
+        echo -e "${ERROR} Your OS Is Not Supported (${YELLOW}${OS_NAME}${NC})"
+        exit 1
+    fi
 }
 
+# ==============================
+# Instalasi Nginx
+nginx_install() {
+    OS_ID=$(grep -w ^ID /etc/os-release | cut -d= -f2 | tr -d '"')
+    OS_NAME=$(grep -w ^PRETTY_NAME /etc/os-release | cut -d= -f2 | tr -d '"')
 
+    if [[ "$OS_ID" == "ubuntu" || "$OS_ID" == "debian" ]]; then
+        print_install "Setup nginx untuk OS: $OS_NAME"
+        apt-get update -y
+        apt-get install -y nginx
+    else
+        echo -e "${ERROR} OS tidak didukung: ${YELLOW}$OS_NAME${NC}"
+    fi
+}
 
 # Update and remove packages
 function base_package() {
