@@ -1,55 +1,60 @@
 #!/bin/bash
 
-# -------------------------------------
+# -----------------------------
+# Warna terminal
+red='\033[0;31m'
+green='\033[0;32m'
+yellow='\033[1;33m'
+nc='\033[0m' # No Color
+
+# -----------------------------
 # Jadwal Backup Otomatis Harian - 23:15
-# -------------------------------------
+cron_file_backup="/etc/cron.d/backup_otomatis"
+backup_script="/usr/local/bin/backup"
+cron_job_backup="15 23 * * * root $backup_script"
 
-cron_file="/etc/cron.d/backup_otomatis"
-backup_script="/usr/local/bin/backup"   # Lokasi skrip backup
-pekerjaan_cron="15 23 * * * root ${backup_script}"
-
-# Cek apakah file backup script ada
-if [[ ! -f "$backup_script" ]]; then
-    echo -e "${ERROR} File backup tidak ditemukan di ${yellow}${backup_script}${nc}"
-    echo -e "${ERROR} Pastikan script backup ada dan bisa dieksekusi."
+# Cek file backup
+if [[ ! -x "$backup_script" ]]; then
+    echo -e "${red}[ERROR]${nc} File backup tidak ditemukan atau tidak bisa dieksekusi: ${yellow}$backup_script${nc}"
+    echo -e "${red}[ERROR]${nc} Pastikan script backup ada dan punya permission eksekusi."
     exit 1
 fi
 
-# Tambahkan cron jika belum ada
-if ! grep -Fq "$pekerjaan_cron" "$cron_file" 2>/dev/null; then
-    echo "$pekerjaan_cron" > "$cron_file"
-    chmod 644 "$cron_file"
-    echo -e "${OK} Backup otomatis dijadwalkan setiap hari pukul 23:15."
+# Tambahkan cron backup jika belum ada
+if grep -Fxq "$cron_job_backup" "$cron_file_backup" 2>/dev/null; then
+    echo -e "${green}[OK]${nc} Cron job backup sudah terpasang di: $cron_file_backup"
 else
-    echo -e "${OK} Cron job backup otomatis sudah terpasang."
+    echo "$cron_job_backup" >> "$cron_file_backup"
+    chmod 644 "$cron_file_backup"
+    echo -e "${green}[OK]${nc} Cron job backup berhasil ditambahkan (harian jam 23:15)."
 fi
 
-# -------------------------------------
+# -----------------------------
 # Jadwal Reboot Otomatis Harian - 00:05
-# -------------------------------------
-cron_file="/etc/cron.d/auto_reboot"
-pekerjaan_cron="5 0 * * * root /sbin/reboot"
+cron_file_reboot="/etc/cron.d/auto_reboot"
+cron_job_reboot="5 0 * * * root /sbin/reboot"
 
-if ! grep -Fq "$pekerjaan_cron" "$cron_file" 2>/dev/null; then
-    echo "$pekerjaan_cron" > "$cron_file"
-    echo "✅ Auto reboot dijadwalkan setiap hari pukul 00:05 (tengah malam lewat 5 menit)."
+if grep -Fxq "$cron_job_reboot" "$cron_file_reboot" 2>/dev/null; then
+    echo -e "ℹ️ Cron job auto reboot sudah terpasang."
 else
-    echo "ℹ️ Cron job auto reboot sudah terpasang."
+    echo "$cron_job_reboot" > "$cron_file_reboot"
+    chmod 644 "$cron_file_reboot"
+    echo -e "✅ Auto reboot dijadwalkan setiap hari pukul 00:05 (tengah malam lewat 5 menit)."
 fi
 
-
-# --------------------------------------------------
+# -----------------------------
 # Jadwal Hapus User Expired Setiap 2 Hari - 03:00 AM
-# --------------------------------------------------
-cron_file="/etc/cron.d/delete_exp"
-pekerjaan_cron="0 3 */2 * * root xp"
+cron_file_exp="/etc/cron.d/delete_exp"
+cron_job_exp="0 3 */2 * * root xp"
 
-if ! grep -Fq "$pekerjaan_cron" "$cron_file" 2>/dev/null; then
-    echo "$pekerjaan_cron" > "$cron_file"
-    echo "✅ Penghapusan user expired dijadwalkan setiap 2 hari pukul 03:00."
+if grep -Fxq "$cron_job_exp" "$cron_file_exp" 2>/dev/null; then
+    echo -e "ℹ️ Cron job delete expired sudah terpasang."
 else
-    echo "ℹ️ Cron job delete expired sudah terpasang."
+    echo "$cron_job_exp" > "$cron_file_exp"
+    chmod 644 "$cron_file_exp"
+    echo -e "✅ Penghapusan user expired dijadwalkan setiap 2 hari pukul 03:00."
 fi
+
 ### Color
 apt upgrade -y
 apt update -y
