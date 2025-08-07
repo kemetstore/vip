@@ -1072,3 +1072,5 @@ echo -e "${green}Script berhasil diinstall.${NC}"
 echo ""
 read -p "$(echo -e "Press ${YELLOW}[ ${NC}${YELLOW}Enter${NC} ${YELLOW}]${NC} untuk reboot") "
 reboot
+
+exit 0
