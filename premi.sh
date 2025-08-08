@@ -156,7 +156,6 @@ function print_install() {
 function print_error() {
     echo -e "${ERROR} ${REDBG} $1 ${NC}"
 }
-
 function print_success() {
     if [[ $? -eq 0 ]]; then
         echo -e "${green}===============================${NC}"
@@ -165,7 +164,6 @@ function print_success() {
         sleep 2
     fi
 }
-
 # === Fungsi Cek Root ===
 function is_root() {
     if [[ $UID -eq 0 ]]; then
@@ -175,8 +173,6 @@ function is_root() {
         exit 1
     fi
 }
-
-
 # Buat direktori xray
 print_install "Membuat direktori xray"
 
@@ -226,7 +222,7 @@ function first_setup() {
     timedatectl set-timezone Asia/Jakarta
 
     echo iptables-persistent iptables-persistent/autosave_v4 boolean true | debconf-set-selections
-    echo iptables-persistent iptables-persistent/autosave_v6 boolean true | debconf-set-selections
+    echo iptables-persistent iptables-persistent/autosave_v6 boolean true | debconf-set-selections 
 
     apt update -y
     apt install nginx iptables-persistent -y
@@ -616,8 +612,6 @@ EOF
 
     print_success "Konfigurasi rc.local, timezone, dan IPv6"
 }
-
-
 function udp_mini() {
     clear
     print_install "Memasang Service Limit Quota & Multi IP"
@@ -669,8 +663,6 @@ EOF
 
     print_success "Semua service limit quota & IP berhasil diaktifkan"
 }
-
-
 function service_vmess_udp() {
     print_install "Memasang UDP-Mini (Service untuk VMESS)"
 
@@ -692,8 +684,6 @@ function service_vmess_udp() {
 
     print_success "UDP-Mini & Limit Quota Service aktif untuk VMESS"
 }
-
-
 function ssh_slow(){
     clear
     print_install "Memasang modul SlowDNS Server"
@@ -719,8 +709,6 @@ function ins_SSHD(){
 
     print_success "SSHD"
 }
-
-
 clear
 function ins_dropbear(){
     clear
@@ -740,8 +728,6 @@ function ins_dropbear(){
 
     print_success "Dropbear"
 }
-
-
 clear
 function ins_vnstat(){
     clear
@@ -765,8 +751,6 @@ function ins_vnstat(){
 
     print_success "Vnstat"
 }
-
-
 function ins_openvpn(){
     clear
     print_install "Menginstall OpenVPN"
@@ -778,8 +762,6 @@ function ins_openvpn(){
     systemctl restart openvpn
     print_success "OpenVPN"
 }
-
-
 function ins_backup(){
     clear
     print_install "Memasang Backup Server"
@@ -801,9 +783,6 @@ function ins_backup(){
 
     print_success "Backup Server"
 }
-
-
-clear
 function ins_swab(){
     clear
     print_install "Memasang Swap 1G + Gotop + BBR"
@@ -832,8 +811,6 @@ function ins_swab(){
 
     print_success "Swap 1G & BBR"
 }
-
-
 function ins_Fail2ban(){
     clear
     print_install "Menginstall Fail2Ban & Anti Torrent"
@@ -850,8 +827,6 @@ function ins_Fail2ban(){
 
     print_success "Fail2Ban"
 }
-
-
 function ins_epro(){
     clear
     print_install "Memasang ePro WebSocket Proxy"
@@ -894,8 +869,6 @@ EOF
 
     print_success "ePro WebSocket Proxy"
 }
-
-
 function ins_restart(){
     clear
     print_install "Restart Semua Layanan"
@@ -915,8 +888,6 @@ function ins_restart(){
 
     print_success "Semua Layanan Dinyalakan Ulang"
 }
-
-
 #Instal Menu
 function menu(){
     clear
@@ -935,7 +906,6 @@ function menu(){
 
     print_success "Menu CLI Terpasang"
 }
-
 # Membaut Default Menu 
 function profile(){
 clear
