@@ -176,17 +176,21 @@ function is_root() {
 # Buat direktori xray
 print_install "Membuat direktori xray"
 
+# Direktori utama
 mkdir -p /etc/xray
 curl -s ifconfig.me > /etc/xray/ipvps
 touch /etc/xray/domain
 
+# Log Xray
 mkdir -p /var/log/xray
 chown www-data:www-data /var/log/xray
 chmod 755 /var/log/xray
 touch /var/log/xray/access.log
 touch /var/log/xray/error.log
 
+# Direktori library tambahan
 mkdir -p /var/lib/kyt >/dev/null 2>&1
+
 
 # Ambil Informasi RAM
 mem_total=0
@@ -474,20 +478,31 @@ function install_xray() {
 
     # Buat direktori socket jika belum ada
     domainSock_dir="/run/xray"
-    [[ ! -d $domainSock_dir ]] && mkdir -p "$domainSock_dir"
-    chown www-data:www-data "$domainSock_dir"
+    if [[ ! -d "$domainSock_dir" ]]; then
+        mkdir -p "$domainSock_dir"
+        chown www-data:www-data "$domainSock_dir"
+    fi
 
     # Install Xray Core 1.8.1
-    bash -c "$(curl -fsSL https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install -u www-data --version 1.8.1
+    if ! bash -c "$(curl -fsSL https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install -u www-data --version 1.8.1; then
+        print_error "Gagal menginstall Xray Core"
+        exit 1
+    fi
 
     # Ambil konfigurasi dasar Xray & service
     echo -e "[INFO] Mengambil konfigurasi Xray dan Service..."
-    wget -q -O /etc/xray/config.json "https://raw.githubusercontent.com/kipasu/nginx/master/config.json"
-    wget -q -O /etc/systemd/system/runn.service "${REPO}Fls/runn.service"
+    wget -q -O /etc/xray/config.json "https://raw.githubusercontent.com/kipasu/nginx/master/config.json" || {
+        print_error "Gagal download config.json"
+        exit 1
+    }
+    wget -q -O /etc/systemd/system/runn.service "${REPO}Fls/runn.service" || {
+        print_error "Gagal download runn.service"
+        exit 1
+    }
 
     # Baca domain & IP
-    domain=$(cat /etc/xray/domain)
-    IPVPS=$(cat /etc/xray/ipvps)
+    domain=$(cat /etc/xray/domain 2>/dev/null)
+    IPVPS=$(cat /etc/xray/ipvps 2>/dev/null)
 
     print_success "Xray Core v1.8.1 berhasil dipasang"
 
@@ -497,14 +512,17 @@ function install_xray() {
     curl -s ipinfo.io/org | cut -d " " -f 2-10 > /etc/xray/isp
 
     # Ambil konfigurasi nginx
-    wget -q -O /etc/nginx/conf.d/xray.conf "https://raw.githubusercontent.com/kipasu/nginx/master/server.conf"
+    wget -q -O /etc/nginx/conf.d/xray.conf "https://raw.githubusercontent.com/kipasu/nginx/master/server.conf" || {
+        print_error "Gagal download xray.conf"
+        exit 1
+    }
     sed -i "s/xxx/${domain}/g" /etc/nginx/conf.d/xray.conf
     curl -s "${REPO}Cfg/nginx.conf" -o /etc/nginx/nginx.conf
 
     # Set permission
     chmod +x /etc/systemd/system/runn.service
 
-    # Buat ulang service Xray manual (jika belum)
+    # Buat ulang service Xray manual
     rm -rf /etc/systemd/system/xray.service.d
     cat > /etc/systemd/system/xray.service <<EOF
 [Unit]
@@ -536,14 +554,18 @@ EOF
     print_success "Konfigurasi Xray & NGINX selesai dan aktif"
 }
 
+function ssh() {
+    clear
+    print_install "Memasang Password SSH"
 
+    # Download konfigurasi password
+    if ! wget -q -O /etc/pam.d/common-password "${REPO}Fls/password"; then
+        print_error "Gagal download file password"
+        exit 1
+    fi
+    chmod +x /etc/pam.d/common-password
 
-function ssh(){
-clear
-print_install "Memasang Password SSH"
-    wget -q -O /etc/pam.d/common-password "${REPO}Fls/password"
-chmod +x /etc/pam.d/common-password
-
+    # Konfigurasi keyboard secara non-interaktif
     DEBIAN_FRONTEND=noninteractive dpkg-reconfigure keyboard-configuration
     debconf-set-selections <<<"keyboard-configuration keyboard-configuration/altgr select The default for the keyboard layout"
     debconf-set-selections <<<"keyboard-configuration keyboard-configuration/compose select No compose key"
@@ -564,8 +586,9 @@ chmod +x /etc/pam.d/common-password
     debconf-set-selections <<<"keyboard-configuration keyboard-configuration/variant select English"
     debconf-set-selections <<<"keyboard-configuration keyboard-configuration/xkb-keymap select "
 
-# go to root
-cd
+    # Pindah ke direktori root
+    cd
+}
 
 function setup_rc_local() {
     print_install "Setup rc.local + Disable IPv6 + Timezone + Locale"
@@ -607,11 +630,12 @@ EOF
     # Set Timezone Asia/Jakarta (GMT +7)
     ln -sf /usr/share/zoneinfo/Asia/Jakarta /etc/localtime
 
-    # Locale fix untuk SSH agar gak error saat remote
+    # Locale fix untuk SSH agar tidak error saat remote
     sed -i 's/^AcceptEnv/#AcceptEnv/' /etc/ssh/sshd_config
 
     print_success "Konfigurasi rc.local, timezone, dan IPv6"
 }
+
 function udp_mini() {
     clear
     print_install "Memasang Service Limit Quota & Multi IP"
