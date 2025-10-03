@@ -185,6 +185,7 @@ export Kernel
 export Arch
 export Public_IP
 
+
 # Fungsi Setup Awal Sistem
 function first_setup() {
     print_install "Melakukan setup awal sistem"
@@ -266,7 +267,7 @@ chronyc sourcestats -v
 chronyc tracking -v
 
 print_success "Packet Yang Dibutuhkan"
-}
+
 
 function base_package() {
     clear
@@ -829,7 +830,6 @@ function ins_Fail2ban(){
     print_success "Fail2Ban"
 }
 
-
 function ins_epro(){
     clear
     print_install "Memasang ePro WebSocket Proxy"
@@ -873,7 +873,6 @@ EOF
     print_success "ePro WebSocket Proxy"
 }
 
-
 function ins_restart(){
     clear
     print_install "Restart Semua Layanan"
@@ -893,8 +892,6 @@ function ins_restart(){
 
     print_success "Semua Layanan Dinyalakan Ulang"
 }
-
-
 #Instal Menu
 function menu(){
     clear
@@ -914,12 +911,15 @@ function menu(){
     print_success "Menu CLI Terpasang"
 }
 
-# Membaut Default Menu 
-function profile(){
-clear
-cat >/root/.profile <<EOF
+# === Fungsi Menu Profile & Cron ===
+function profile() {
+    clear
+    print_install "Membuat Default Menu & Cron Jobs"
+
+    # === Update ~/.profile ===
+    cat >/root/.profile <<'EOF'
 # ~/.profile: executed by Bourne-compatible login shells.
-if [ "\$BASH" ]; then
+if [ "$BASH" ]; then
     if [ -f ~/.bashrc ]; then
         . ~/.bashrc
     fi
@@ -928,87 +928,86 @@ mesg n || true
 welcome
 EOF
 
-# Cron job untuk clear log
-cat >/etc/cron.d/log_clear <<EOF
+    chmod 644 /root/.profile
+
+    # === Cron job untuk clear log ===
+    cat >/etc/cron.d/log_clear <<'EOF'
 8 0 * * * root /usr/local/bin/log_clear
 EOF
 
-cat >/usr/local/bin/log_clear <<EOF
+    cat >/usr/local/bin/log_clear <<'EOF'
 #!/bin/bash
-tanggal=\$(date +"%m-%d-%Y")
-waktu=\$(date +"%T")
-echo "Successfully cleared log at \$tanggal \$waktu." >> /root/log-clear.txt
+tanggal=$(date +"%m-%d-%Y")
+waktu=$(date +"%T")
+echo "Successfully cleared log at $tanggal $waktu." >> /root/log-clear.txt
 systemctl restart udp-custom.service
 EOF
-chmod +x /usr/local/bin/log_clear
+    chmod +x /usr/local/bin/log_clear
 
-# Cron job untuk backup
-cat >/etc/cron.d/daily_backup <<EOF
+    # === Cron job untuk daily backup ===
+    cat >/etc/cron.d/daily_backup <<'EOF'
 */59 * * * * root /usr/local/bin/daily_backup
 EOF
 
-cat >/usr/local/bin/daily_backup <<EOF
+    cat >/usr/local/bin/daily_backup <<'EOF'
 #!/bin/bash
-tanggal=\$(date +"%m-%d-%Y")
-waktu=\$(date +"%T")
-echo "Successfully backed up at \$tanggal \$waktu." >> /root/log-backup.txt
+tanggal=$(date +"%m-%d-%Y")
+waktu=$(date +"%T")
+echo "Successfully backed up at $tanggal $waktu." >> /root/log-backup.txt
 /usr/sbin/backup -r now
 EOF
-chmod +x /usr/local/bin/daily_backup
+    chmod +x /usr/local/bin/daily_backup
 
-# Cron job untuk xp_sc
-cat >/etc/cron.d/xp_sc <<EOF
+    # === Cron job untuk xp_sc ===
+    cat >/etc/cron.d/xp_sc <<'EOF'
 5 0 * * * root /usr/local/bin/xp_sc
 EOF
 
-cat >/usr/local/bin/xp_sc <<EOF
+    cat >/usr/local/bin/xp_sc <<'EOF'
 #!/bin/bash
 /usr/sbin/expsc -r now
 EOF
-chmod +x /usr/local/bin/xp_sc
+    chmod +x /usr/local/bin/xp_sc
 
-# Cron untuk xp_all
-cat >/etc/cron.d/xp_all <<EOF
+    # === Cron untuk xp_all ===
+    cat >/etc/cron.d/xp_all <<'EOF'
 2 0 * * * root /usr/sbin/xp
 EOF
 
-# Cron untuk logclean
-cat >/etc/cron.d/logclean <<EOF
+    # === Cron untuk logclean ===
+    cat >/etc/cron.d/logclean <<'EOF'
 */10 * * * * root /usr/sbin/clearlog
 EOF
 
-chmod 644 /root/.profile
-
-# Reboot harian
-cat >/etc/cron.d/daily_reboot <<EOF
+    # === Reboot harian ===
+    cat >/etc/cron.d/daily_reboot <<'EOF'
 5 0 * * * root /sbin/reboot
 EOF
 
-# Clear log nginx dan xray
-echo "*/1 * * * * root echo -n > /var/log/nginx/access.log" > /etc/cron.d/log.nginx
-echo "*/1 * * * * root echo -n > /var/log/xray/access.log" > /etc/cron.d/log.xray
+    # === Clear log NGINX & Xray ===
+    echo "*/1 * * * * root echo -n > /var/log/nginx/access.log" > /etc/cron.d/log.nginx
+    echo "*/1 * * * * root echo -n > /var/log/xray/access.log" > /etc/cron.d/log.xray
 
-# Aktifkan cron service
-service cron restart
+    # === Aktifkan cron service ===
+    service cron restart
 
-# Set waktu reboot
-echo "5" > /home/daily_reboot
+    # === Set shell tambahan & reboot time ===
+    echo "/bin/false" >> /etc/shells
+    echo "/usr/sbin/nologin" >> /etc/shells
+    echo "5" > /home/daily_reboot
 
-# Shell tambahan
-echo "/bin/false" >> /etc/shells
-echo "/usr/sbin/nologin" >> /etc/shells
+    # === Format waktu AM/PM untuk info ===
+    AUTOREB=$(cat /home/daily_reboot)
+    SETT=11
+    if [[ $AUTOREB -gt $SETT ]]; then
+        TIME_DATE="PM"
+    else
+        TIME_DATE="AM"
+    fi
 
-# Format waktu
-AUTOREB=$(cat /home/daily_reboot)
-SETT=11
-if [[ $AUTOREB -gt $SETT ]]; then
-    TIME_DATE="PM"
-else
-    TIME_DATE="AM"
-fi
-
-print_success "Menu Packet"
+    print_success "✅ Default Menu & Cron Jobs berhasil dibuat"
 }
+
 # Fingsi Install Script
 function instal(){
     clear
