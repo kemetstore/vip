@@ -1,10 +1,7 @@
 #!/bin/bash
+set -euo pipefail
 
-# === Update & Install Tools Dasar ===
-apt update -y && apt upgrade -y
-apt install -y lolcat wondershaper curl wget jq
-
-# === WARNA ===
+# === WARNA & STATUS ===
 GREEN="\e[92;1m"
 RED="\033[31m"
 YELLOW="\033[33m"
@@ -14,50 +11,18 @@ NC='\e[0m'
 OK="${GREEN}[OK]${NC}"
 ERROR="${RED}[ERROR]${NC}"
 
-# === BACA INFO ISP DAN KOTA (fallback kalau file nggak ada) ===
-ISP=$(cat /etc/xray/isp 2>/dev/null || echo "Unknown")
-CITY=$(cat /etc/xray/city 2>/dev/null || echo "Unknown")
-
-# === DAPATKAN IP PUBLIK ===
-ipsaya=$(curl -s https://ipinfo.io/ip)
-
-# === TAMPILKAN INFO AWAL ===
-clear
-echo -e "${YELLOW}-----------------------------------------------${NC}"
-echo -e "${GREEN}           KEMET JS STORE INITIAL SETUP${NC}"
-echo -e "${YELLOW}-----------------------------------------------${NC}"
-echo -e "${BLUE}IP Address  :${NC} $ipsaya"
-echo -e "${BLUE}ISP         :${NC} $ISP"
-echo -e "${BLUE}City        :${NC} $CITY"
-echo -e "${YELLOW}-----------------------------------------------${NC}"
-sleep 2
-
-# === BANNER ===
-clear
-echo -e "${YELLOW}----------------------------------------------------------${NC}"
-echo -e "   Welcome to ${GREEN}KEMET JS STORE VPN Setup${NC} ${YELLOW}(Stable Edition)${NC}"
-echo -e "   This script will quickly install a VPN server on your system."
-echo -e "   Author  : ${GREEN}Kemet Premium®${NC} (${BLUE}kemetjs.github.io${NC})"
-echo -e "${YELLOW}----------------------------------------------------------${NC}"
-echo ""
-sleep 2
-
-# === CEK ARSITEKTUR OS ===
-arch=$(uname -m)
-echo -e "${OK} Detected Architecture: ${GREEN}$arch${NC}"
-
-if [[ "$arch" != "x86_64" ]]; then
-    echo -e "${YELLOW}[WARNING]${NC} Non-x86_64 architecture detected. Pastikan script kompatibel."
-fi
+info()  { echo -e "[*] $*"; }
+succ()  { echo -e "${OK} $*"; }
+warn()  { echo -e "${YELLOW}[WARNING]${NC} $*"; }
+fail()  { echo -e "${ERROR} $*"; }
 
 # === CEK SISTEM OPERASI ===
 os_id=$(grep -w ID /etc/os-release | cut -d= -f2 | tr -d '"')
 os_name=$(grep -w PRETTY_NAME /etc/os-release | cut -d= -f2 | tr -d '"')
 
 echo -e "${OK} Detected OS: ${GREEN}$os_name${NC}"
-
 if [[ "$os_id" != "ubuntu" && "$os_id" != "debian" ]]; then
-    echo -e "${YELLOW}[WARNING]${NC} Non-Ubuntu/Debian system detected. Pastikan semua fitur kompatibel."
+    warn "Non-Ubuntu/Debian system detected. Pastikan semua fitur kompatibel."
 fi
 
 # === VALIDASI MANUAL (ENTER UNTUK LANJUT) ===
@@ -67,33 +32,32 @@ echo ""
 
 # === CEK AKSES ROOT ===
 if [ "${EUID}" -ne 0 ]; then
-    echo -e "${ERROR} You need to run this script as root."
+    fail "You need to run this script as root."
     exit 1
 fi
 
 # === CEK VIRTUALISASI ===
 if [ "$(systemd-detect-virt)" == "openvz" ]; then
-    echo -e "${ERROR} OpenVZ virtualization is not supported."
+    fail "OpenVZ virtualization is not supported."
     exit 1
 fi
 
 # === IZIN SCRIPT ===
 MYIP=$(curl -sS ipv4.icanhazip.com)
-echo -e "${GREEN}Loading authorization data...${NC}"
+info "Loading authorization data..."
 sleep 1
 clear
 
-
-# Ambil informasi user dari izin database
-username=$(curl -s https://raw.githubusercontent.com/kemetstore/izinsc/main/ip | grep $MYIP | awk '{print $2}')
-exp_date=$(curl -s https://raw.githubusercontent.com/kemetstore/izinsc/main/ip | grep $MYIP | awk '{print $3}')
-geo_exp=$(curl -s https://raw.githubusercontent.com/kemetstore/izinsc/main/ip | grep $MYIP | awk '{print $4}')
+# Ambil informasi user dari database izin online
+username=$(curl -s https://raw.githubusercontent.com/kemetstore/izinsc/main/ip | grep "$MYIP" | awk '{print $2}')
+exp_date=$(curl -s https://raw.githubusercontent.com/kemetstore/izinsc/main/ip | grep "$MYIP" | awk '{print $3}')
+geo_exp=$(curl -s https://raw.githubusercontent.com/kemetstore/izinsc/main/ip | grep "$MYIP" | awk '{print $4}')
 
 # Simpan ke file lokal
 echo "$username" > /usr/bin/user
 echo "$exp_date" > /usr/bin/e
 
-# Tampilkan detail
+# Tampilkan detail izin
 today=$(date +%Y-%m-%d)
 if [[ -n "$exp_date" ]]; then
     d1=$(date -d "$exp_date" +%s)
@@ -104,12 +68,13 @@ else
 fi
 
 # Tampilkan info
-echo -e "${green}Authorization Success${NC}"
-echo -e "${green}Username     :${NC} $username"
-echo -e "${green}IP Address   :${NC} $MYIP"
-echo -e "${green}Expiry Date  :${NC} $exp_date"
-echo -e "${green}Valid for    :${NC} $cert_days days"
+echo -e "${GREEN}Authorization Success${NC}"
+echo -e "${GREEN}Username     :${NC} ${username:-Unknown}"
+echo -e "${GREEN}IP Address   :${NC} ${MYIP:-Unknown}"
+echo -e "${GREEN}Expiry Date  :${NC} ${exp_date:-Unknown}"
+echo -e "${GREEN}Valid for    :${NC} ${cert_days:-Unknown} days"
 echo ""
+
 
 # ========================
 # STATUS EXPIRED / AKTIF
@@ -156,6 +121,7 @@ function print_install() {
 function print_error() {
     echo -e "${ERROR} ${REDBG} $1 ${NC}"
 }
+
 function print_success() {
     if [[ $? -eq 0 ]]; then
         echo -e "${green}===============================${NC}"
@@ -164,6 +130,7 @@ function print_success() {
         sleep 2
     fi
 }
+
 # === Fungsi Cek Root ===
 function is_root() {
     if [[ $UID -eq 0 ]]; then
@@ -173,24 +140,22 @@ function is_root() {
         exit 1
     fi
 }
+
+
 # Buat direktori xray
 print_install "Membuat direktori xray"
 
-# Direktori utama
 mkdir -p /etc/xray
 curl -s ifconfig.me > /etc/xray/ipvps
 touch /etc/xray/domain
 
-# Log Xray
 mkdir -p /var/log/xray
 chown www-data:www-data /var/log/xray
 chmod 755 /var/log/xray
 touch /var/log/xray/access.log
 touch /var/log/xray/error.log
 
-# Direktori library tambahan
 mkdir -p /var/lib/kyt >/dev/null 2>&1
-
 
 # Ambil Informasi RAM
 mem_total=0
@@ -226,7 +191,7 @@ function first_setup() {
     timedatectl set-timezone Asia/Jakarta
 
     echo iptables-persistent iptables-persistent/autosave_v4 boolean true | debconf-set-selections
-    echo iptables-persistent iptables-persistent/autosave_v6 boolean true | debconf-set-selections 
+    echo iptables-persistent iptables-persistent/autosave_v6 boolean true | debconf-set-selections
 
     apt update -y
     apt install nginx iptables-persistent -y
@@ -284,7 +249,7 @@ ins_package "cmake"
 ins_package "git"
 ins_package "screen"
 ins_package "socat"
-ins_package "xz-utlis"
+ins_package "xz-utils"
 ins_package "apt-transport-https"
 ins_package "bash-completion"
 ins_package "ntpdate"
@@ -293,8 +258,8 @@ ins_package "openvpn"
 ins_package "easy-rsa"
 ins_package "chrony"
 
-systemctl enable chronyd
-systemctl restart chronyd
+systemctl enable chrony
+systemctl restart chrony
 systemctl enable chrony
 systemctl restart chrony
 chronyc sourcestats -v
@@ -306,39 +271,51 @@ print_success "Packet Yang Dibutuhkan"
 function base_package() {
     clear
     sleep 1
-    print_install "Menginstall Packet Yang Dibutuhkan"
-    sudo apt update -y
-    sudo apt install sudo -y
+    print_install "Menginstall Paket Yang Dibutuhkan"
+
+    # Update & install dasar
+    apt update -y
+    apt install -y sudo debconf-utils p7zip-full \
+        --no-install-recommends software-properties-common lsb-release gnupg curl
+
+    # Bersih & hapus paket yang nggak dipakai
     sudo apt-get clean all
-    sudo apt install -y debconf-utils
-    sudo apt install p7zip-full -y
-    sudo apt-get remove --purge ufw firewalld -y
-    sudo apt-get remove --purge exim4 -y
+    sudo apt-get remove --purge -y ufw firewalld exim4
     sudo apt-get autoremove -y
-    sudo apt install -y --no-install-recommends software-properties-common
+
+    # Set auto-save iptables
     echo iptables-persistent iptables-persistent/autosave_v4 boolean true | sudo debconf-set-selections
     echo iptables-persistent iptables-persistent/autosave_v6 boolean true | sudo debconf-set-selections
-    sudo DEBIAN_FRONTEND=noninteractive apt-get -y install iptables iptables-persistent netfilter-persistent libxml-parser-perl squid screen curl jq bzip2 gzip coreutils rsyslog zip unzip net-tools sed bc apt-transport-https build-essential dirmngr libxml-parser-perl lsof openvpn easy-rsa fail2ban tmux squid dropbear socat cron bash-completion ntpdate xz-utils apt-transport-https chrony pkg-config bison make git speedtest-cli p7zip-full zlib1g-dev python-is-python3 python3-pip shc build-essential nodejs nginx php php-fpm php-cli php-mysql p7zip-full squid libcurl4-openssl-dev
 
-    # remove unnecessary files
-    sudo apt-get autoclean -y >/dev/null 2>&1
-    sudo apt-get -y --purge remove unscd >/dev/null 2>&1
-    sudo apt-get -y --purge remove samba* >/dev/null 2>&1
-    sudo apt-get -y --purge remove apache2* >/dev/null 2>&1
-    sudo apt-get -y --purge remove bind9* >/dev/null 2>&1
-    sudo apt-get -y remove sendmail* >/dev/null 2>&1
-    sudo apt autoremove -y >/dev/null 2>&1
-    print_success "Packet Yang Dibutuhkan"
+    # Install paket utama
+    sudo DEBIAN_FRONTEND=noninteractive apt-get -y install \
+        iptables iptables-persistent netfilter-persistent libxml-parser-perl \
+        squid screen curl jq bzip2 gzip coreutils rsyslog zip unzip net-tools sed bc \
+        apt-transport-https build-essential dirmngr lsof openvpn easy-rsa fail2ban tmux \
+        dropbear socat cron bash-completion ntpdate xz-utils chrony pkg-config bison make git \
+        speedtest-cli zlib1g-dev python3 python3-pip shc nodejs npm nginx \
+        php php-fpm php-cli php-mysql libcurl4-openssl-dev
+
+    # Optional: install latest Node.js LTS jika default terlalu lawas
+    curl -fsSL https://deb.nodesource.com/setup_lts.x | bash -
+    apt-get install -y nodejs
+}
+
+
+
+# remove unnecessary files
+sudo apt-get autoclean -y >/dev/null 2>&1
+sudo apt-get -y --purge removd unscd >/dev/null 2>&1
+sudo apt-get -y --purge remove samba* >/dev/null 2>&1
+sudo apt-get -y --purge remove apache2* >/dev/null 2>&1
+sudo apt-get -y --purge remove bind9* >/dev/null 2>&1
+sudo apt-get -y remove sendmail* >/dev/null 2>&1
+apt autoremove -y >/dev/null 2>&1
+print_success "Packet Yang Dibutuhkan"
 }
 clear
 # Fungsi input domain
 function pasang_domain() {
-    # Definisi warna (jika belum ada)
-    red='\e[31m'
-    green='\e[32m'
-    yellow='\e[33m'
-    nc='\e[0m'
-
     clear
     echo -e "    ----------------------------------"
     echo -e "   |\e[1;32m Please Select a Domain Type Below \e[0m|"
@@ -349,16 +326,11 @@ function pasang_domain() {
     read -p "   Please select 1 or 2 (default: 2) : " host
     echo ""
 
-    # Jika tidak input, default ke 2
-    if [[ -z "$host" ]]; then
-        host=2
-    fi
-
     if [[ "$host" == "1" ]]; then
         clear
-        echo -e "   \e[1;36m===============================$nc"
-        echo -e "   \e[1;32m      GANTI DOMAIN MANUAL $nc"
-        echo -e "   \e[1;36m===============================$nc"
+        echo -e "   \e[1;36m===============================$NC"
+        echo -e "   \e[1;32m      GANTI DOMAIN MANUAL $NC"
+        echo -e "   \e[1;36m===============================$NC"
         echo ""
         read -p "   Masukkan Domain Anda : " host1
 
@@ -430,6 +402,9 @@ function install_ssl() {
 
     print_success "✅ SSL Certificate berhasil dipasang untuk domain: $domain"
 }
+
+
+
 function make_folder_xray() {
 rm -rf /etc/vmess/.vmess.db
     rm -rf /etc/vless/.vless.db
@@ -478,31 +453,20 @@ function install_xray() {
 
     # Buat direktori socket jika belum ada
     domainSock_dir="/run/xray"
-    if [[ ! -d "$domainSock_dir" ]]; then
-        mkdir -p "$domainSock_dir"
-        chown www-data:www-data "$domainSock_dir"
-    fi
+    [[ ! -d $domainSock_dir ]] && mkdir -p "$domainSock_dir"
+    chown www-data:www-data "$domainSock_dir"
 
     # Install Xray Core 1.8.1
-    if ! bash -c "$(curl -fsSL https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install -u www-data --version 1.8.1; then
-        print_error "Gagal menginstall Xray Core"
-        exit 1
-    fi
+    bash -c "$(curl -fsSL https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install -u www-data --version 1.8.1
 
     # Ambil konfigurasi dasar Xray & service
     echo -e "[INFO] Mengambil konfigurasi Xray dan Service..."
-    wget -q -O /etc/xray/config.json "https://raw.githubusercontent.com/kipasu/nginx/master/config.json" || {
-        print_error "Gagal download config.json"
-        exit 1
-    }
-    wget -q -O /etc/systemd/system/runn.service "${REPO}Fls/runn.service" || {
-        print_error "Gagal download runn.service"
-        exit 1
-    }
+    wget -q -O /etc/xray/config.json "https://raw.githubusercontent.com/kipasu/nginx/master/config.json"
+    wget -q -O /etc/systemd/system/runn.service "${REPO}Fls/runn.service"
 
     # Baca domain & IP
-    domain=$(cat /etc/xray/domain 2>/dev/null)
-    IPVPS=$(cat /etc/xray/ipvps 2>/dev/null)
+    domain=$(cat /etc/xray/domain)
+    IPVPS=$(cat /etc/xray/ipvps)
 
     print_success "Xray Core v1.8.1 berhasil dipasang"
 
@@ -512,17 +476,14 @@ function install_xray() {
     curl -s ipinfo.io/org | cut -d " " -f 2-10 > /etc/xray/isp
 
     # Ambil konfigurasi nginx
-    wget -q -O /etc/nginx/conf.d/xray.conf "https://raw.githubusercontent.com/kipasu/nginx/master/server.conf" || {
-        print_error "Gagal download xray.conf"
-        exit 1
-    }
+    wget -q -O /etc/nginx/conf.d/xray.conf "https://raw.githubusercontent.com/kipasu/nginx/master/server.conf"
     sed -i "s/xxx/${domain}/g" /etc/nginx/conf.d/xray.conf
     curl -s "${REPO}Cfg/nginx.conf" -o /etc/nginx/nginx.conf
 
     # Set permission
     chmod +x /etc/systemd/system/runn.service
 
-    # Buat ulang service Xray manual
+    # Buat ulang service Xray manual (jika belum)
     rm -rf /etc/systemd/system/xray.service.d
     cat > /etc/systemd/system/xray.service <<EOF
 [Unit]
@@ -554,18 +515,15 @@ EOF
     print_success "Konfigurasi Xray & NGINX selesai dan aktif"
 }
 
+
+
 function ssh() {
     clear
     print_install "Memasang Password SSH"
 
-    # Download konfigurasi password
-    if ! wget -q -O /etc/pam.d/common-password "${REPO}Fls/password"; then
-        print_error "Gagal download file password"
-        exit 1
-    fi
+    wget -q -O /etc/pam.d/common-password "${REPO}Fls/password"
     chmod +x /etc/pam.d/common-password
 
-    # Konfigurasi keyboard secara non-interaktif
     DEBIAN_FRONTEND=noninteractive dpkg-reconfigure keyboard-configuration
     debconf-set-selections <<<"keyboard-configuration keyboard-configuration/altgr select The default for the keyboard layout"
     debconf-set-selections <<<"keyboard-configuration keyboard-configuration/compose select No compose key"
@@ -586,9 +544,10 @@ function ssh() {
     debconf-set-selections <<<"keyboard-configuration keyboard-configuration/variant select English"
     debconf-set-selections <<<"keyboard-configuration keyboard-configuration/xkb-keymap select "
 
-    # Pindah ke direktori root
+    # go to root
     cd
 }
+
 
 function setup_rc_local() {
     print_install "Setup rc.local + Disable IPv6 + Timezone + Locale"
@@ -630,11 +589,12 @@ EOF
     # Set Timezone Asia/Jakarta (GMT +7)
     ln -sf /usr/share/zoneinfo/Asia/Jakarta /etc/localtime
 
-    # Locale fix untuk SSH agar tidak error saat remote
+    # Locale fix untuk SSH agar gak error saat remote
     sed -i 's/^AcceptEnv/#AcceptEnv/' /etc/ssh/sshd_config
 
     print_success "Konfigurasi rc.local, timezone, dan IPv6"
 }
+
 
 function udp_mini() {
     clear
@@ -687,6 +647,8 @@ EOF
 
     print_success "Semua service limit quota & IP berhasil diaktifkan"
 }
+
+
 function service_vmess_udp() {
     print_install "Memasang UDP-Mini (Service untuk VMESS)"
 
@@ -708,6 +670,8 @@ function service_vmess_udp() {
 
     print_success "UDP-Mini & Limit Quota Service aktif untuk VMESS"
 }
+
+
 function ssh_slow(){
     clear
     print_install "Memasang modul SlowDNS Server"
@@ -733,6 +697,8 @@ function ins_SSHD(){
 
     print_success "SSHD"
 }
+
+
 clear
 function ins_dropbear(){
     clear
@@ -752,6 +718,8 @@ function ins_dropbear(){
 
     print_success "Dropbear"
 }
+
+
 clear
 function ins_vnstat(){
     clear
@@ -775,6 +743,8 @@ function ins_vnstat(){
 
     print_success "Vnstat"
 }
+
+
 function ins_openvpn(){
     clear
     print_install "Menginstall OpenVPN"
@@ -786,6 +756,8 @@ function ins_openvpn(){
     systemctl restart openvpn
     print_success "OpenVPN"
 }
+
+
 function ins_backup(){
     clear
     print_install "Memasang Backup Server"
@@ -807,6 +779,9 @@ function ins_backup(){
 
     print_success "Backup Server"
 }
+
+
+clear
 function ins_swab(){
     clear
     print_install "Memasang Swap 1G + Gotop + BBR"
@@ -835,6 +810,8 @@ function ins_swab(){
 
     print_success "Swap 1G & BBR"
 }
+
+
 function ins_Fail2ban(){
     clear
     print_install "Menginstall Fail2Ban & Anti Torrent"
@@ -851,6 +828,8 @@ function ins_Fail2ban(){
 
     print_success "Fail2Ban"
 }
+
+
 function ins_epro(){
     clear
     print_install "Memasang ePro WebSocket Proxy"
@@ -893,6 +872,8 @@ EOF
 
     print_success "ePro WebSocket Proxy"
 }
+
+
 function ins_restart(){
     clear
     print_install "Restart Semua Layanan"
@@ -912,6 +893,8 @@ function ins_restart(){
 
     print_success "Semua Layanan Dinyalakan Ulang"
 }
+
+
 #Instal Menu
 function menu(){
     clear
@@ -930,6 +913,7 @@ function menu(){
 
     print_success "Menu CLI Terpasang"
 }
+
 # Membaut Default Menu 
 function profile(){
 clear
@@ -1066,5 +1050,3 @@ echo -e "${green}Script berhasil diinstall.${NC}"
 echo ""
 read -p "$(echo -e "Press ${YELLOW}[ ${NC}${YELLOW}Enter${NC} ${YELLOW}]${NC} untuk reboot") "
 reboot
-
-exit 0
